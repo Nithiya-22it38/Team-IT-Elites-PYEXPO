@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Diet Planner</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+<body>
+  <header>
+    <div class="container nav-container">
+      <div class="logo" aria-label="Diet Planner Logo">
+        <img src="https://img.icons8.com/ios-filled/50/4B8F29/apple.png" alt="Apple icon" class="logo-icon" />
+        <span>DietPlanner</span>
+      </div>
+      <nav id="nav" aria-label="Primary navigation">
+        <a href="#home">Home</a>
+        <a href="#calculator">Calorie Calculator</a>
+        <a href="#planner">Meal Planner</a>
+        <a href="#database">Food Database</a>
+        {% if user %}
+          <a href="{{ url_for('logout') }}" class="login-btn">Logout</a>
+        {% else %}
+          <a href="#login" class="login-btn">Login/Signup</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for message in messages %}
+            <li>{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Hero Section -->
+    <section class="hero" id="home" role="banner">
+      <div class="container hero-content">
+        <div class="hero-text">
+          <h1>Plan Your Meals, Reach Your Goals</h1>
+          <p>Take control of your nutrition with our easy-to-use diet planner. Calculate your calorie needs, plan healthy meals, and track your progress—all in one place.</p>
+          {% if not user %}
+            <a href="#login" class="cta-btn">Start Planning</a>
+          {% endif %}
+        </div>
+        <div class="hero-image">
+          <img src="{{ url_for('static', filename='meal.img.jpg') }}" alt="Fresh healthy fruits and vegetables" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Calorie Calculator -->
+    <section class="card-section" id="calculator">
+      <div class="container">
+        <h2>Calorie Calculator</h2>
+        <form class="calc-form" action="{{ url_for('calculate') }}" method="POST">
+          <label>Age <input name="age" type="number" min="10" max="100" required></label>
+          <label>Gender
+            <select name="gender" required>
+              <option value="" disabled selected>Select</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </label>
+          <label>Height (cm) <input name="height" type="number" min="100" max="250" required></label>
+          <label>Weight (kg) <input name="weight" type="number" min="30" max="200" required></label>
+          <label>Activity
+            <select name="activity" required>
+              <option value="" disabled selected>Select</option>
+              <option value="Sedentary">Sedentary</option>
+              <option value="Lightly Active">Lightly Active</option>
+              <option value="Moderately Active">Moderately Active</option>
+              <option value="Very Active">Very Active</option>
+            </select>
+          </label>
+          <label>Goal
+            <select name="goal" required>
+              <option value="" disabled selected>Select</option>
+              <option value="Lose Weight">Lose Weight</option>
+              <option value="Maintain Weight">Maintain Weight</option>
+              <option value="Gain Weight">Gain Weight</option>
+            </select>
+          </label>
+          <button type="submit" class="cta-btn">Calculate</button>
+        </form>
+        {% if calorie_result is defined %}
+          <div class="result-card">
+            <h3>Your Daily Calorie Needs:</h3>
+            <div class="calorie-value">{{ calorie_result }} kcal</div>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- Meal Planner & History -->
+    <section class="card-section" id="planner">
+      <div class="container">
+        <h2>Meal Planner</h2>
+        {% if user %}
+          <!-- Meal History Date Picker -->
+          <form action="{{ url_for('history') }}" method="POST" style="margin-bottom:1rem;">
+            <label for="history_date"><strong>View Meal History:</strong></label>
+            <input type="date" id="history_date" name="history_date" value="{{ history_date if history_date else '' }}">
+            <button type="submit" class="cta-btn">View</button>
+            {% if history_mode %}
+              <a href="{{ url_for('index') }}" class="cta-btn" style="background:#ccc;color:#222;">Back to Today</a>
+            {% endif %}
+          </form>
+          {% if history_mode %}
+            <h3>Viewing meals for: {{ history_date }}</h3>
+          {% endif %}
+
+          <!-- Daily Nutrition Summary -->
+          {% if daily_totals %}
+            <div class="summary-card">
+              <h3>Nutrition Summary</h3>
+              <ul>
+                <li><strong>Calories:</strong> {{ daily_totals.calories }} kcal</li>
+                <li><strong>Carbs:</strong> {{ daily_totals.carbs }} g</li>
+                <li><strong>Protein:</strong> {{ daily_totals.protein }} g</li>
+                <li><strong>Fats:</strong> {{ daily_totals.fats }} g</li>
+              </ul>
+            </div>
+          {% endif %}
+
+          <!-- Add Meal Form (only on today's planner) -->
+          {% if not history_mode %}
+          <form action="{{ url_for('add_meal') }}" method="POST" style="margin-bottom:2rem;">
+            <label>
+              Meal Type:
+              <select name="meal_type" required>
+                <option>Breakfast</option>
+                <option>Lunch</option>
+                <option>Dinner</option>
+              </select>
+            </label>
+            <label>
+              Food:
+              <select name="food_id" required>
+                {% for food in foods %}
+                  <option value="{{ food['id'] }}">{{ food['name'] }} ({{ food['calories'] }} kcal)</option>
+                {% endfor %}
+              </select>
+            </label>
+            <button type="submit" class="cta-btn">Add Food</button>
+          </form>
+          {% endif %}
+
+          <!-- Meals Display -->
+          <div class="meals-grid">
+            {% for meal_type in ['Breakfast','Lunch','Dinner'] %}
+            <article class="meal-card">
+              <h3>{{ meal_type }}</h3>
+              <ul>
+                {% for meal in meals if meal['meal_type'] == meal_type %}
+                  <li>{{ meal['name'] }} <span>{{ meal['calories'] }} kcal</span></li>
+                {% endfor %}
+              </ul>
+            </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p>Please log in to use the meal planner.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- Food Database -->
+    <section class="card-section" id="database">
+      <div class="container">
+        <h2>Food Database</h2>
+        <div class="food-table-wrap">
+          <table class="food-table">
+            <thead>
+              <tr>
+                <th>Food</th>
+                <th>Calories</th>
+                <th>Carbs</th>
+                <th>Protein</th>
+                <th>Fats</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for food in foods %}
+              <tr>
+                <td>{{ food['name'] }}</td>
+                <td>{{ food['calories'] }}</td>
+                <td>{{ food['carbs'] }}</td>
+                <td>{{ food['protein'] }}</td>
+                <td>{{ food['fats'] }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+<section class="card-section" id="login">
+  <div class="container">
+    <h2>Login / Signup</h2>
+    {% if not user %}
+      <div class="auth-forms">
+        <div class="login-form-wrapper">
+          <h3>Login</h3>
+          <form class="login-form" action="{{ url_for('login') }}" method="POST">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" required />
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" required />
+            <button class="cta-btn" type="submit">Login</button>
+          </form>
+        </div>
+        <div class="signup-form-wrapper">
+          <h3>Signup</h3>
+          <form class="login-form" action="{{ url_for('signup') }}" method="POST">
+            <label for="signup-email">Email</label>
+            <input id="signup-email" name="email" type="email" required />
+            <label for="signup-password">Password</label>
+            <input id="signup-password" name="password" type="password" required />
+            <button class="cta-btn" type="submit">Signup</button>
+          </form>
+        </div>
+      </div>
+    {% else %}
+      <p>You are logged in as {{ user }}.</p>
+    {% endif %}
+  </div>
+</section>
+<footer>
+    <div class="container footer-content">
+      <div><a href="#">Contact</a> | <a href="#">Privacy Policy</a></div>
+      <div class="muted">&copy; 2023 DietPlanner</div>
+    </div>
+  </footer>
+</body>
+</html>
